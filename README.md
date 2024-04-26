@@ -1,7 +1,7 @@
 ![pipeline-min](https://github.com/kapiaszczyk/tiny-cicd/assets/41442206/f4d48f9f-a697-4bcf-9b58-7a2a42b1a2fb)
 _This picture is here just to give you a break from all the text._
 
-# tiny-cicd
+# Tiny CI/CD
 An attempt at creating a local CI/CD pipeline that deploys a docker image to a RaspberryPI.
 
 ## The goal
