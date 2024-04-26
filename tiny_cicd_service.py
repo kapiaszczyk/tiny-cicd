@@ -1,55 +1,38 @@
 """Service part for the tiny CI/CD system"""
 
-def pull_code():
-    """Pull code from GitHub."""
-    return "PULLING CODE"
+import git
+from tiny_cicd_logger import Logger
+
+logger = Logger("tiny-cicd")
 
 
-def test_code():
-    """Test code."""
-    return "TESTING CODE"
+class TinyCICDService:
+    """Tiny CI/CD service class."""
+
+    def __init__(self):
+        self.status = "IDLE"
 
 
-def build_image():
-    """Build Docker image."""
-    return "BUILDING IMAGE"
+    def get_status(self):
+        """Get CI/CD pipeline status."""
+        return self.status
 
 
-def deploy_image():
-    """Deploy Docker image."""
-    return "DEPLOYING IMAGE"
+    def trigger_pipeline(self, url):
+        """Trigger the CI/CD pipeline."""
 
 
-def pull_image():
-    """Pull Docker image."""
-    return "PULLING IMAGE"
+    def pull_code(self, url):
+        """Pull code from GitHub."""
 
 
-def run_container():
-    """Run Docker container."""
-    return "RUNNING CONTAINER"
+    def test_code(self):
+        """Test code."""
 
 
-def stop_container():
-    """Stop Docker container."""
-    return "STOPPING CONTAINER"
+    def build_image(self):
+        """Build Docker image."""
 
 
-def remove_container():
-    """Remove Docker container."""
-    return "REMOVING CONTAINER"
-
-
-def remove_image():
-    """Remove Docker image."""
-    return "REMOVING IMAGE"
-
-
-def cleanup():
-    """Cleanup after deploy."""
-    return "CLEANING UP"
-
-
-def rollback():
-    """Rollback to the previous version."""
-    return "ROLLBACK"
+    def is_git_repo(self):
+        """Check if the current directory is a git repository."""

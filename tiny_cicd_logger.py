@@ -2,24 +2,25 @@
 
 import logging
 
-logger = logging.getLogger(__name__)
 
+class Logger:
+    """Logger class for tiny CI/CD pipelines."""
+    def __init__(self, name):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.INFO)
+        # Check if handlers already exist
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
 
-def setup_logger():
-    """Set up the logger."""
-    logger.setLevel(logging.INFO)
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
-
-def log(message, severity):
-    """Log a message."""
-    if severity == "info":
-        logger.info(message)
-    elif severity == "warning":
-        logger.warning(message)
-    elif severity == "error":
-        logger.error(message)
+    def log(self, message, severity):
+        """Log a message with a given severity."""
+        if severity == "info":
+            self.logger.info(message)
+        elif severity == "warning":
+            self.logger.warning(message)
+        elif severity == "error":
+            self.logger.error(message)
+            self.logger.error(message)
