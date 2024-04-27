@@ -6,7 +6,9 @@ ENV DEPLOYMENTS_DIR=/app/deployments
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apk update && \
+    apk add --no-cache git openssh-client && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 

@@ -15,7 +15,7 @@ class Logger:
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
 
-    def log(self, message, severity):
+    def log(self, message, severity="info"):
         """Log a message with a given severity."""
         if severity == "info":
             self.logger.info(message)
@@ -23,4 +23,6 @@ class Logger:
             self.logger.warning(message)
         elif severity == "error":
             self.logger.error(message)
-            self.logger.error(message)
+        elif severity is None:
+            self.logger.info(message)
+        
