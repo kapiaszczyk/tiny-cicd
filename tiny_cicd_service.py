@@ -24,6 +24,10 @@ class TinyCICDService:
     def get_status(self):
         """Get CI/CD pipeline status."""
         return self.status
+    
+
+    def get_pipeline_details(self):
+        return f"Status: {self.status}, Repo name: {self.repo_name}, Repo type: {self.project_type}"
 
 
     def trigger_pipeline(self, url):

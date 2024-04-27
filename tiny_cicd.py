@@ -15,6 +15,14 @@ def status():
     return "OK"
 
 
+@app.route("/details")
+def details():
+    """Get CI/CD service details."""
+    details = service.get_pipeline_details()
+    logger.log("details")
+    return details
+
+
 @app.route("/pipeline-status")
 def pipeline_status():
     """Get CI/CD pipeline status."""
