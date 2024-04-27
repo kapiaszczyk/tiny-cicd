@@ -18,6 +18,7 @@ class TinyCICDService:
         self.repo_name = ""
         self.repo_directory = ""
         self.repo_url = ""
+        self.project_type = ""
 
 
     def get_status(self):
@@ -46,6 +47,12 @@ class TinyCICDService:
 
         self.status = "IDLE"
 
+        self.project_type = self.detect_project_type()
+
+        self.status = "IDLE"
+
+        self.test_code
+
     def clone_repository(self, url):
         """Clone repository from GitHub"""
 
@@ -72,6 +79,12 @@ class TinyCICDService:
     def test_code(self):
         """Test code."""
 
+        self.status = "RUNNING TESTS"
+
+        logger.log("Running tests", "info")
+
+        return None
+
 
     def build_image(self):
         """Build Docker image."""
@@ -79,6 +92,7 @@ class TinyCICDService:
 
     def is_git_repo(self):
         """Check if the current directory is a git repository."""
+
 
     def is_repo_cloned(self, url):
         """Check if provided directory exists and/or create it"""
@@ -105,6 +119,7 @@ class TinyCICDService:
             logger.log("Repository is not cloned", "info")
             return False
 
+
     def resolve_repository_name(self, url):
         """Get repository name from the git repository url."""
         logger.log("Resolving repository name", "info")
@@ -117,9 +132,55 @@ class TinyCICDService:
             logger.log(f"Name resolved to {name}", "info")
             return name
         
+        
     def is_git_repo(self, path):
+        """Checks if given directory contains a git repository."""
         try:
             _ = git.Repo(path).git_dir
             return True
         except git.exc.InvalidGitRepositoryError:
             return False
+
+
+    def detect_project_type(self):
+        """Detects the type of the project."""
+
+        self.status = "DETECTING PROJECT TYPE"
+
+        if self.is_maven_project() is True:
+            return "MAVEN"
+        elif self.is_dotnet_project() is True:
+            return "DOTNET"
+        elif self.is_python_project() is True:
+            return "PYTHON"
+        elif self.is_go_project() is True:
+            return "GO"
+        else:
+            return "UNSUPPORTED"
+
+
+    def is_maven_project(self):
+        """Check if project is a Maven project (checks for pom.xml file)."""
+        pom_xml_path = os.path.join(self.repo_directory, "pom.xml")
+        return os.path.exists(pom_xml_path)
+
+
+    def is_dotnet_project(self):
+        """Check if project is a .NET project (checks for .csproj file)."""
+        for filename in os.listdir(self.repo_directory):
+            if filename.endswith(".csproj") or filename.endswith(".cs"):
+                return True
+        return False 
+    
+
+    def is_python_project(self):
+        """Check if project is a Python project (checks for requirements.txt file)"""
+        requirements_txt_path = os.path.join(self.repo_directory, "requirements.txt")
+        setup_py_path = os.path.join(self.repo_directory, "setup.py")
+        return os.path.exists(requirements_txt_path) or os.path.exists(setup_py_path)
+    
+
+    def is_go_project(self):
+        """Check if project is a Go project (checks for go.mod file)"""
+        go_mod_path = os.path.join(self.repo_directory, "go.mod")
+        return os.path.exists(go_mod_path)
