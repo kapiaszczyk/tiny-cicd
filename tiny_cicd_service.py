@@ -92,7 +92,7 @@ class TinyCICDService:
         """Pull code from GitHub."""
 
         self.status = "PULLING CODE"
-        
+
         logger.log("Pulling code from the repository", "info")
 
         os.chdir(self.repo_directory)
@@ -104,10 +104,11 @@ class TinyCICDService:
         """Test code."""
 
         self.status = "RUNNING TESTS"
-
         logger.log("Running tests", "info")
 
-        self.run_tests_in_docker_container()
+        test_runner = TestRunnerService()
+
+        test_runner.run_tests(self.repo_name, self.project_type, self.pipeline_dir, self.repo_directory)
 
         return None
 
@@ -210,16 +211,62 @@ class TinyCICDService:
         """Check if project is a Go project (checks for go.mod file)"""
         go_mod_path = os.path.join(self.repo_directory, "go.mod")
         return os.path.exists(go_mod_path)
-    
 
-    def run_tests_in_docker_container(self):
+
+class TestRunnerService:
+    """Service class for running tests in a Docker container."""
+
+    def __init__(self):
+        self.logger = Logger("TestRunnerService")
+        return
+
+    def run_tests(self, repo_name, project_type, pipeline_dir, project_dir):
+
+        image_tag = self.build_test_image(repo_name, project_type, pipeline_dir, project_dir)
+
+        return self.run_test_container(image_tag)
+
+    def build_test_image(self, repo_name, project_type, pipeline_dir, project_dir):
+
+        image_tag = f"tiny-cicd-testrunner-{repo_name}".lower()
+        dockerfile = "Dockerfile"
+
+        self.logger.log(f"Building Docker image with tag: {image_tag}")
+
+        # Check if there is a Dockerfile in the project directory
+        # If there is, remove it to avoid conflicts with the test image
+        if(os.path.exists(os.path.join(project_dir, dockerfile))):
+            self.logger.log(f"Removing existing Dockerfile from project directory: {project_dir}")
+            os.remove(os.path.join(project_dir, dockerfile))
+
+
+        dockerfile_source_path = os.path.join(pipeline_dir, "test-runner", project_type.lower(), dockerfile)
+        dockerfile_destination_path = project_dir
+
+        shutil.copy(dockerfile_source_path, dockerfile_destination_path)
+        self.logger.log(f"{dockerfile} copied successfully from '{dockerfile_source_path}' to '{dockerfile_destination_path}'.")
+
+        docker_build_cmd = [
+            "docker", "build",
+            "-t", image_tag,
+            project_dir
+        ]
+
+        try:
+            subprocess.check_call(docker_build_cmd)
+            self.logger.log(f"Successfully built Docker image: {image_tag}")
+            return image_tag
+        except subprocess.CalledProcessError as e:
+            self.logger.log(f"Error building Docker image: {e}")
+            return None
+
+
+    def run_test_container(self, image_tag):
         """Runs testing suite in a sibling container"""
-
-        image_tag = self.build_test_image()
 
         if not image_tag:
             logger.log("Failed to build Docker image. Aborting.")
-            return  
+            return
 
         client = docker.from_env()
 
@@ -233,7 +280,7 @@ class TinyCICDService:
             container.remove()
 
             exit_code = result["StatusCode"]
-            
+
             if exit_code == 0:
                 logger.log("Tests passed")
             else:
@@ -246,55 +293,9 @@ class TinyCICDService:
             logger.log(f"An unexpected error occurred: {e}")
 
         self.cleanup_after_tests(client, image_tag)
-    
 
-    def build_java_test_image(self):
-        """Creates a container for testing Java applications."""
-        return True
-    
+        return exit_code
 
-    def build_dotnet_test_image(self):
-        """Creates a container for testing .NET applications."""
-        return True
-
-
-    def build_test_image(self):
-        """Builds a Docker image for testing Python applications."""
-
-        logger.log("Building a docker image")
-
-        image_tag = f"testrunner-{self.repo_name}".lower()
-
-        filename = "Dockerfile"
-
-        # Check if project directory contains a Dockerfile and remove it if it does
-        # A Dockerfile will clash with the test image
-        source_path = os.path.join((self.pipeline_dir + "/test-runner/" + self.project_type.lower()), filename)
-        destination_path = os.getcwd()
-
-        if os.path.exists(destination_path + "/Dockerfile") :
-            os.remove((destination_path + "/Dockerfile"))
-        shutil.copy(source_path, destination_path)
-        print(f"File '{filename}' copied successfully from '{source_path}' to '{destination_path}'.")
-
-        docker_build_cmd = [
-            "docker", "build",
-            "-t", image_tag,    
-            "."
-        ]
-
-        try:
-            subprocess.check_call(docker_build_cmd)
-            print(f"Successfully built Docker image: {image_tag}")
-            return image_tag
-        except subprocess.CalledProcessError as e:
-            print(f"Error building Docker image: {e}")
-            return None
-    
-
-    def build_go_test_image(self):
-        """Creates a container for testing Go applications."""
-        return True
 
     def cleanup_after_tests(self, docker_client, image_tag):
 
