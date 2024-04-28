@@ -27,7 +27,7 @@ class TinyCICDService:
         self.pipeline_dir = os.getcwd()
         self.deployments = deployments_dir
 
-        
+
     def to_json(self):
         data = {
             "status": self.status,
@@ -44,7 +44,7 @@ class TinyCICDService:
     def get_status(self):
         """Get CI/CD pipeline status."""
         return self.status
-    
+
 
     def get_pipeline_details(self):
         return f"Status: {self.status}, Repo name: {self.repo_name}, Repo type: {self.project_type}, Working dir: {self.pipeline_dir}"
@@ -77,6 +77,7 @@ class TinyCICDService:
 
         self.test_code()
 
+
     def clone_repository(self, url):
         """Clone repository from GitHub"""
 
@@ -97,7 +98,6 @@ class TinyCICDService:
 
         os.chdir(self.repo_directory)
         subprocess.check_call(["git", "pull", url])
-
 
 
     def test_code(self):
@@ -158,8 +158,8 @@ class TinyCICDService:
             name = url.split("/")[-1]
             logger.log(f"Name resolved to {name}", "info")
             return name
-        
-        
+
+
     def is_git_repo(self, path):
         """Checks if given directory contains a git repository."""
         try:
@@ -197,15 +197,15 @@ class TinyCICDService:
         for filename in os.listdir(self.repo_directory):
             if filename.endswith(".csproj") or filename.endswith(".cs"):
                 return True
-        return False 
-    
+        return False
+
 
     def is_python_project(self):
         """Check if project is a Python project (checks for requirements.txt file)"""
         requirements_txt_path = os.path.join(self.repo_directory, "requirements.txt")
         setup_py_path = os.path.join(self.repo_directory, "setup.py")
         return os.path.exists(requirements_txt_path) or os.path.exists(setup_py_path)
-    
+
 
     def is_go_project(self):
         """Check if project is a Go project (checks for go.mod file)"""
@@ -238,7 +238,6 @@ class TestRunnerService:
         if(os.path.exists(os.path.join(project_dir, dockerfile))):
             self.logger.log(f"Removing existing Dockerfile from project directory: {project_dir}")
             os.remove(os.path.join(project_dir, dockerfile))
-
 
         dockerfile_source_path = os.path.join(pipeline_dir, "test-runner", project_type.lower(), dockerfile)
         dockerfile_destination_path = project_dir
