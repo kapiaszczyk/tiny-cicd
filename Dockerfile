@@ -14,4 +14,6 @@ COPY . .
 
 EXPOSE 5050
 
+VOLUME [ "/app/deployments" ]
+
 CMD ["python", "tiny_cicd.py"]
