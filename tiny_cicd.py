@@ -20,7 +20,7 @@ def details():
     """Get CI/CD service details."""
     details = service.get_pipeline_details()
     logger.log("details")
-    return details
+    return details, 200, {"Content-Type": "application/json"}
 
 
 @app.route("/pipeline-status")
@@ -51,7 +51,7 @@ def github_webhook():
     logger.log(f"Received push event for {repo_name} with commit {last_commit}", "info")
     logger.log(f"Previous commit was {previous_commit}", "info")
 
-    service.trigger_pipeline(url)
+    service.trigger_pipeline(url, repo_name)
 
     return "OK"
 
