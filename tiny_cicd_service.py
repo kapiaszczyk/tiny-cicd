@@ -9,7 +9,6 @@ import json
 
 from tiny_cicd_logger import Logger
 
-# deployments_dir = os.getenv('DEPLOYMENTS_DIR')
 deployments_dir = "/deployments"
 
 logger = Logger("tiny-cicd")
