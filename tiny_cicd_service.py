@@ -47,7 +47,7 @@ class TinyCICDService:
 
 
     def get_pipeline_details(self):
-        return f"Status: {self.status}, Repo name: {self.repo_name}, Repo type: {self.project_type}, Working dir: {self.pipeline_dir}"
+        return self.to_json()
 
 
     def trigger_pipeline(self, url):
