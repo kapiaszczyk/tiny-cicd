@@ -27,6 +27,7 @@ class TinyCICDService:
         self.project_type = ""
         self.pipeline_dir = pipeline_dir
         self.deployment_dir = deployments_dir
+        self.last_tag_number = ""
 
 
     def to_json(self):
@@ -60,8 +61,6 @@ class TinyCICDService:
 
         self.pull_code()
 
-        self.project_type = UtilService().get_project_type(self.repo_directory)
-
         self.test_code()
 
 
@@ -70,6 +69,8 @@ class TinyCICDService:
 
         git_service = GitService(self.repo_url, self.repo_directory, self.repo_name)
         git_service.resolve_code()
+
+        self.project_type = UtilService().get_project_type(self.repo_directory)
 
 
     def test_code(self):
@@ -94,58 +95,68 @@ class TestRunnerService:
 
     def __init__(self):
         self.logger = Logger("TestRunnerService")
+        self.saved_dockerfile_content = ""
         return
 
     def run_tests(self, repo_name, project_type, pipeline_dir, project_dir):
+        """Runs test suite for the managed project."""
 
         image_tag = self.build_test_image(repo_name, project_type, pipeline_dir, project_dir)
 
-        return self.run_test_container(image_tag)
+        return self.run_test_container(image_tag, project_dir)
 
     def build_test_image(self, repo_name, project_type, pipeline_dir, project_dir):
-
+        """Builds test image for the managed project."""
         image_tag = f"tiny-cicd-testrunner-{repo_name}".lower()
         dockerfile = "Dockerfile"
 
         self.logger.log(f"Building Docker image with tag: {image_tag}")
 
-        # Check if there is a Dockerfile in the project directory
-        # If there is, remove it to avoid conflicts with the test image
-        if(os.path.exists(os.path.join(project_dir, dockerfile))):
+        if self.remove_existing_dockerfile(project_dir, dockerfile):
+            self.copy_dockerfile(pipeline_dir, project_type, dockerfile, project_dir)
+
+        os.chdir(project_dir)
+
+        if self.run_docker_build(image_tag):
+            self.logger.log(f"Successfully built Docker image: {image_tag}")
+            return image_tag
+        else:
+            self.logger.log(f"Error building Docker image.")
+            return None
+
+    def remove_existing_dockerfile(self, project_dir, dockerfile):
+        """Removes existing Dockerfile from repository."""
+        dockerfile_path = os.path.join(project_dir, dockerfile)
+        if os.path.exists(dockerfile_path):
             self.logger.log(f"Removing existing Dockerfile from project directory: {project_dir}")
-            os.remove(os.path.join(project_dir, dockerfile))
+            service = DockerService()
+            self.saved_dockerfile_content = service.read_dockerfile_content(dockerfile_path)
+            os.remove(dockerfile_path)
+            return True
+        return False
 
-
+    def copy_dockerfile(self, pipeline_dir, project_type, dockerfile, project_dir):
+        """Copies the test Dockerfile template into the repository folder."""
         dockerfile_source_path = os.path.join(pipeline_dir, "test-runner", project_type.lower(), dockerfile)
         dockerfile_destination_path = project_dir
 
         shutil.copy(dockerfile_source_path, dockerfile_destination_path)
         self.logger.log(f"{dockerfile} copied successfully from '{dockerfile_source_path}' to '{dockerfile_destination_path}'.")
 
-        print("Moving to project directory to build Docker image: " + project_dir)
-
-        os.chdir(project_dir)
-
-        print("Current directory: " + os.getcwd())
-
-        docker_build_cmd = [
-            "docker", "build",
-            "-t", image_tag,
-            "."
-        ]
-
-        logger.log(f"Running Docker build command: {docker_build_cmd}")
+    def run_docker_build(self, image_tag):
+        """Runs docker image build process."""
+        docker_build_cmd = ["docker", "build", "-t", image_tag, "."]
+        self.logger.log(f"Running Docker build command: {docker_build_cmd}")
 
         try:
             subprocess.check_call(docker_build_cmd)
-            self.logger.log(f"Successfully built Docker image: {image_tag}")
-            return image_tag
+            return True
         except subprocess.CalledProcessError as e:
             self.logger.log(f"Error building Docker image: {e}")
-            return None
+            return False
 
 
-    def run_test_container(self, image_tag):
+    def run_test_container(self, image_tag, project_dir):
         """Runs testing suite in a sibling container"""
 
         os.chdir(pipeline_dir)
@@ -178,14 +189,15 @@ class TestRunnerService:
         except Exception as e:
             logger.log(f"An unexpected error occurred: {e}")
 
-        self.cleanup_after_tests(client, image_tag)
+        self.cleanup_after_tests(client, image_tag, project_dir)
 
         return exit_code
 
 
-    def cleanup_after_tests(self, docker_client, image_tag):
+    def cleanup_after_tests(self, docker_client, image_tag, project_dir):
+        """Cleans up test container and image"""
 
-        os.chdir(deployments_dir)
+        os.chdir(pipeline_dir)
 
         client = docker_client
 
@@ -193,14 +205,26 @@ class TestRunnerService:
             image = client.images.get(image_tag)
             client.images.remove(image.id)
 
-            print(f"Successfully removed Docker image: {image_tag}")
-            return True
+            self.logger.log(f"Successfully removed Docker image: {image_tag}")
+        
+            if(os.path.exists(os.path.join(project_dir, "Dockerfile"))):
+                self.logger.log(f"Removing test Dockerfile from project directory: {project_dir}")
+                os.remove(os.path.join(project_dir, "Dockerfile"))
+                self.logger.log(f"Restoring Dockerfile from to directory: {self.saved_dockerfile_content}")
+                service = DockerService()
+                service.write_content_to_dockerfile(self.saved_dockerfile_content, (os.path.join(project_dir, "Dockerfile")))
+                self.logger.log("Succesfully written to file")
+
         except docker.errors.ImageNotFound:
             print(f"Docker image not found: {image_tag}")
             return False
         except Exception as e:
             print(f"An error occurred while removing Docker image: {e}")
             return False
+        except Exception as e:
+            print(f"An error occurred while restoring Docker image: {e}")
+            return False
+
 
 class UtilService:
 
@@ -333,3 +357,23 @@ class GitService:
 
         os.chdir(self.repo_directory)
         subprocess.check_call(["git", "pull", self.repo_url])
+
+
+class DockerService:
+    """Class for handling Docker related operations."""
+
+    def __init__(self) -> None:
+        pass
+    
+
+    def read_dockerfile_content(self, path):
+        """Reads Dockerfile content and returns it as a string."""
+        with open(path, 'r', encoding="UTF-8") as file:
+            dockerfile_content = file.read()
+            return dockerfile_content
+        
+
+    def write_content_to_dockerfile(self, content, path):
+        """Writes content to Dockerfile."""
+        with open(path, 'w', encoding="UTF-8") as file:
+            file.write(content)
