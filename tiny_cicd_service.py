@@ -12,11 +12,11 @@ from tiny_cicd_logger import Logger
 deployments_dir = "deployments"
 pipeline_dir = os.getcwd()
 
-logger = Logger("tiny-cicd")
-
 
 class TinyCICDService:
     """Tiny CI/CD service class."""
+
+    logger = Logger("TinyCICDService")
 
     def __init__(self):
         self.status = "IDLE"
@@ -70,7 +70,7 @@ class TinyCICDService:
         """Test code."""
 
         self.status = "RUNNING TESTS"
-        logger.log("Running tests", "info")
+        self.logger.log("Running tests", "info")
 
         test_runner = TestRunnerService()
 
@@ -85,8 +85,9 @@ class TinyCICDService:
 class TestRunnerService:
     """Service class for running tests in a Docker container."""
 
+    logger = Logger("TestRunnerService")
+
     def __init__(self):
-        self.logger = Logger("TestRunnerService")
         self.saved_dockerfile_content = ""
         return
 
@@ -144,7 +145,7 @@ class TestRunnerService:
         if os.path.exists(os.path.join(project_dir, "Dockerfile")):
             self.logger.log(f"Removing test Dockerfile from project directory: {project_dir}")
             os.remove(os.path.join(project_dir, "Dockerfile"))
-            self.logger.log(f"Restoring Dockerfile from to directory: {self.saved_dockerfile_content}")
+            self.logger.log(f"Restoring Dockerfile to directory: {project_dir}")
             service = DockerService()
             service.write_content_to_dockerfile(self.saved_dockerfile_content,
                                                 (os.path.join(project_dir, "Dockerfile")))
@@ -177,14 +178,16 @@ class TestRunnerService:
             self.restore_dockerfile(project_dir)
 
         except docker.errors.ImageNotFound:
-            print(f"Docker image not found: {image_tag}")
+            self.logger.log(f"Docker image not found: {image_tag}", "error")
             return False
         except Exception as e:
-            print(f"An error occurred while removing Docker image: {e}")
+            self.logger.log(f"An error occurred while removing Docker image: {e}", "error")
             return False
 
 
 class UtilService:
+
+    logger = Logger("UtilService")
 
     def __init__(self):
         return
@@ -192,7 +195,7 @@ class UtilService:
     def get_project_type(self, repo_directory):
         """Detects the type of the project."""
 
-        print(f"Detecting project type for {repo_directory}")
+        self.logger.log(f"Detecting project type for {repo_directory}")
 
         if self.is_maven_project(repo_directory) is True:
             return "MAVEN"
@@ -230,19 +233,22 @@ class UtilService:
 
     def resolve_repository_name(self, url):
         """Get repository name from the git repository url."""
-        logger.log("Resolving repository name", "info")
+        self.logger.log("Resolving repository name", "info")
         if url.endswith(".git"):
             name = url[:-4].split("/")[-1]
-            logger.log(f"Name resolved to {name}", "info")
+            self.logger.log(f"Name resolved to {name}", "info")
             return name
         else:
             name = url.split("/")[-1]
-            logger.log(f"Name resolved to {name}", "info")
+            self.logger.log(f"Name resolved to {name}", "info")
             return name
 
 
 class GitService:
     """Service class for Git operations."""
+
+    logger = Logger("GitService")
+
 
     def __init__(self, repo_url, repo_directory, repo_name):
         self.project_type = ""
@@ -265,22 +271,22 @@ class GitService:
     def is_repo_cloned(self):
         """Check if provided directory exists and/or create it"""
 
-        logger.log("Checking if repository is cloned", "info")
+        self.logger.log("Checking if repository is cloned", "info")
 
         if not os.path.exists(self.repo_directory):
-            logger.log("Project directory does not exist", "info")
+            self.logger.log("Project directory does not exist", "info")
             os.makedirs(self.repo_directory)
         if os.path.exists(self.repo_directory):
-            logger.log("Deployment directory exists", "info")
+            self.logger.log("Deployment directory exists", "info")
             if self.is_git_repo():
-                logger.log(f"Repository is cloned", "info")
+                self.logger.log(f"Repository is cloned", "info")
                 return True
             else:
-                logger.log(f"Repository is not cloned but {self.repo_directory} exists", "info")
+                self.logger.log(f"Repository is not cloned but {self.repo_directory} exists", "info")
                 os.rmdir(self.repo_directory)
                 return False
         else:
-            logger.log("Repository is not cloned", "info")
+            self.logger.log("Repository is not cloned", "info")
             return False
 
     def is_git_repo(self):
@@ -294,7 +300,7 @@ class GitService:
     def clone_repository(self):
         """Clone repository from GitHub"""
 
-        logger.log("Cloning code from the repository", "info")
+        self.logger.log("Cloning code from the repository", "info")
 
         os.chdir(deployments_dir)
         subprocess.check_call(["git", "clone", self.repo_url])
@@ -302,7 +308,7 @@ class GitService:
     def pull_code(self):
         """Pull code from GitHub."""
 
-        logger.log("Pulling code from the repository", "info")
+        self.logger.log("Pulling code from the repository", "info")
 
         os.chdir(self.repo_directory)
         subprocess.check_call(["git", "pull", self.repo_url])
@@ -310,6 +316,9 @@ class GitService:
 
 class DockerService:
     """Class for handling Docker related operations."""
+
+    logger = Logger("DockerService")
+
 
     def __init__(self) -> None:
         pass
@@ -328,20 +337,20 @@ class DockerService:
     def run_docker_build(self, image_tag):
         """Runs docker image build process."""
         docker_build_cmd = ["docker", "build", "-t", image_tag, "."]
-        logger.log(f"Running Docker build command: {docker_build_cmd}")
+        self.logger.log(f"Running Docker build command: {docker_build_cmd}")
 
         try:
             subprocess.check_call(docker_build_cmd)
             return True
         except subprocess.CalledProcessError as e:
-            logger.log(f"Error building Docker image: {e}")
+            self.logger.log(f"Error building Docker image: {e}")
             return False
 
     def run_docker_image(self, image_tag):
         """Runs specified docker image and returns container exit status code."""
 
         if not image_tag:
-            logger.log("No image tag provided.")
+            self.logger.log("No image tag provided.")
             return
 
         client = docker.from_env()
@@ -358,11 +367,11 @@ class DockerService:
             exit_code = result["StatusCode"]
 
         except docker.errors.ContainerError as e:
-            logger.log(f"Error running tests in Docker container: {e}")
+            self.logger.log(f"Error running tests in Docker container: {e}")
         except docker.errors.ImageNotFound as e:
-            logger.log(f"Docker image not found: {e}")
+            self.logger.log(f"Docker image not found: {e}")
         except Exception as e:
-            logger.log(f"An unexpected error occurred: {e}")
+            self.logger.log(f"An unexpected error occurred: {e}")
 
         return exit_code
 
@@ -375,11 +384,11 @@ class DockerService:
             image = client.images.get(image_tag)
             client.images.remove(image.id)
 
-            logger.log(f"Successfully removed Docker image: {image_tag}")
+            self.logger.log(f"Successfully removed Docker image: {image_tag}")
 
         except docker.errors.ImageNotFound:
-            logger.log(f"Docker image not found: {image_tag}", "error")
+            self.logger.log(f"Docker image not found: {image_tag}", "error")
             return False
         except Exception as e:
-            logger.log(f"An error occurred while removing Docker image: {e}", "error")
+            self.logger.log(f"An error occurred while removing Docker image: {e}", "error")
             return False
