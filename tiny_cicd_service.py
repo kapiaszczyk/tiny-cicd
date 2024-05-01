@@ -9,7 +9,6 @@ import json
 
 from tiny_cicd_logger import Logger
 
-
 deployments_dir = "deployments"
 pipeline_dir = os.getcwd()
 
@@ -29,7 +28,6 @@ class TinyCICDService:
         self.deployment_dir = deployments_dir
         self.last_tag_number = ""
 
-
     def to_json(self):
         data = {
             "status": self.status,
@@ -42,15 +40,12 @@ class TinyCICDService:
         }
         return json.dumps(data)
 
-
     def get_status(self):
         """Get CI/CD pipeline status."""
         return self.status
 
-
     def get_pipeline_details(self):
         return self.to_json()
-
 
     def trigger_pipeline(self, url, repo_name):
         """Trigger the CI/CD pipeline."""
@@ -63,7 +58,6 @@ class TinyCICDService:
 
         self.test_code()
 
-
     def pull_code(self):
         """Pull code from GitHub."""
 
@@ -71,7 +65,6 @@ class TinyCICDService:
         git_service.resolve_code()
 
         self.project_type = UtilService().get_project_type(self.repo_directory)
-
 
     def test_code(self):
         """Test code."""
@@ -84,7 +77,6 @@ class TinyCICDService:
         test_runner.run_tests(self.repo_name, self.project_type, self.pipeline_dir, self.repo_directory)
 
         return None
-
 
     def build_image(self):
         """Build Docker image."""
@@ -143,21 +135,20 @@ class TestRunnerService:
         dockerfile_destination_path = project_dir
 
         shutil.copy(dockerfile_source_path, dockerfile_destination_path)
-        self.logger.log(f"{dockerfile} copied successfully from '{dockerfile_source_path}' to '{dockerfile_destination_path}'.")
-
+        self.logger.log(
+            f"{dockerfile} copied successfully from '{dockerfile_source_path}' to '{dockerfile_destination_path}'.")
 
     def restore_dockerfile(self, project_dir):
         """Restores removed Dockerfile"""
 
-        if(os.path.exists(os.path.join(project_dir, "Dockerfile"))):
+        if os.path.exists(os.path.join(project_dir, "Dockerfile")):
             self.logger.log(f"Removing test Dockerfile from project directory: {project_dir}")
             os.remove(os.path.join(project_dir, "Dockerfile"))
             self.logger.log(f"Restoring Dockerfile from to directory: {self.saved_dockerfile_content}")
             service = DockerService()
-            service.write_content_to_dockerfile(self.saved_dockerfile_content, (os.path.join(project_dir, "Dockerfile")))
+            service.write_content_to_dockerfile(self.saved_dockerfile_content,
+                                                (os.path.join(project_dir, "Dockerfile")))
             self.logger.log("Succesfully written to file")
-
-
 
     def run_test_container(self, image_tag, project_dir):
         """Runs testing suite in a sibling container"""
@@ -172,7 +163,6 @@ class TestRunnerService:
 
         return exit_code
 
-
     def cleanup_after_tests(self, image_tag, project_dir):
         """Cleans up test container and image"""
 
@@ -183,7 +173,7 @@ class TestRunnerService:
             service = DockerService()
 
             service.remove_docker_image(image_tag)
-        
+
             self.restore_dockerfile(project_dir)
 
         except docker.errors.ImageNotFound:
@@ -191,9 +181,6 @@ class TestRunnerService:
             return False
         except Exception as e:
             print(f"An error occurred while removing Docker image: {e}")
-            return False
-        except Exception as e:
-            print(f"An error occurred while restoring Docker image: {e}")
             return False
 
 
@@ -218,12 +205,10 @@ class UtilService:
         else:
             return "UNSUPPORTED"
 
-
     def is_maven_project(self, repo_directory):
         """Check if project is a Maven project (checks for pom.xml file)."""
         pom_xml_path = os.path.join(repo_directory, "pom.xml")
         return os.path.exists(pom_xml_path)
-
 
     def is_dotnet_project(self, repo_directory):
         """Check if project is a .NET project (checks for .csproj file)."""
@@ -232,19 +217,16 @@ class UtilService:
                 return True
         return False
 
-
     def is_python_project(self, repo_directory):
         """Check if project is a Python project (checks for requirements.txt file)"""
         requirements_txt_path = os.path.join(repo_directory, "requirements.txt")
         setup_py_path = os.path.join(repo_directory, "setup.py")
         return os.path.exists(requirements_txt_path) or os.path.exists(setup_py_path)
 
-
     def is_go_project(self, repo_directory):
         """Check if project is a Go project (checks for go.mod file)"""
         go_mod_path = os.path.join(repo_directory, "go.mod")
         return os.path.exists(go_mod_path)
-
 
     def resolve_repository_name(self, url):
         """Get repository name from the git repository url."""
@@ -268,7 +250,6 @@ class GitService:
         self.repo_name = repo_name
         self.repo_url = repo_url
 
-
     def resolve_code(self):
         """Pull code from GitHub."""
 
@@ -280,7 +261,6 @@ class GitService:
             self.clone_repository()
 
         os.chdir(pipeline_dir)
-
 
     def is_repo_cloned(self):
         """Check if provided directory exists and/or create it"""
@@ -303,7 +283,6 @@ class GitService:
             logger.log("Repository is not cloned", "info")
             return False
 
-
     def is_git_repo(self):
         """Checks if given directory contains a git repository."""
         try:
@@ -320,7 +299,6 @@ class GitService:
         os.chdir(deployments_dir)
         subprocess.check_call(["git", "clone", self.repo_url])
 
-
     def pull_code(self):
         """Pull code from GitHub."""
 
@@ -335,14 +313,12 @@ class DockerService:
 
     def __init__(self) -> None:
         pass
-    
 
     def read_dockerfile_content(self, path):
         """Reads Dockerfile content and returns it as a string."""
         with open(path, 'r', encoding="UTF-8") as file:
             dockerfile_content = file.read()
             return dockerfile_content
-
 
     def write_content_to_dockerfile(self, content, path):
         """Writes content to Dockerfile."""
@@ -360,14 +336,14 @@ class DockerService:
         except subprocess.CalledProcessError as e:
             logger.log(f"Error building Docker image: {e}")
             return False
-        
+
     def run_docker_image(self, image_tag):
         """Runs specified docker image and returns container exit status code."""
 
         if not image_tag:
             logger.log("No image tag provided.")
             return
-        
+
         client = docker.from_env()
 
         try:
@@ -389,7 +365,6 @@ class DockerService:
             logger.log(f"An unexpected error occurred: {e}")
 
         return exit_code
-    
 
     def remove_docker_image(self, image_tag):
         """Removes docker image from the image list."""
