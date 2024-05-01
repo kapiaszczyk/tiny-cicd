@@ -61,6 +61,8 @@ class TinyCICDService:
 
         self.build_image()
 
+        self.push_image()
+
     def pull_code(self):
         """Pull code from GitHub."""
 
@@ -96,6 +98,15 @@ class TinyCICDService:
         service.run_docker_build(image_tag, self.repo_directory)
 
         self.last_tag_number = image_tag
+
+        self.logger.log(f"Latest image tag is: {self.last_tag_number}")
+
+    def push_image(self):
+        "Push image to DockerHub."
+
+        service = DockerService()
+
+        service.push_image(self.last_tag_number)
 
 
 class TestRunnerService:
@@ -255,6 +266,18 @@ class UtilService:
             name = url.split("/")[-1]
             self.logger.log(f"Name resolved to {name}", "info")
             return name
+
+    def parse_docker_image_tag(self, image_tag):
+        """Parse Docker image tag <repository>/<image_name>:<tag> into repository, image name, and tag."""
+        if ':' in image_tag:
+            repository_image, tag = image_tag.split(':')
+        else:
+            repository_image = image_tag
+            tag = None
+
+        repository, image_name = repository_image.split('/', 1)
+
+        return repository, image_name, tag
 
 
 class GitService:
@@ -433,3 +456,25 @@ class DockerService:
         except Exception as e:
             self.logger.log(f"An error occurred while removing Docker image: {e}", "error")
             return False
+
+    def push_image(self, image_tag):
+        """Pushes image to Docker Hub."""
+
+        util_service = UtilService()
+
+        repository, image_name, image_tag = util_service.parse_docker_image_tag(image_tag)
+
+        client = docker.from_env()
+
+        image_name = f"{repository}/{image_name}:{image_tag}"
+
+        try:
+            # Push the image to Docker Hub
+            for line in client.images.push(image_name, stream=True, decode=True):
+                if 'status' in line:
+                    self.logger.log(f"Pushing: {line['status']}", "info")
+
+            self.logger.log(f"Successfully pushed image to Docker Hub: {image_name}", "info")
+
+        except docker.errors.APIError as e:
+            self.logger.log(f"Failed to push image to Docker Hub with reason: {e}", "error")
