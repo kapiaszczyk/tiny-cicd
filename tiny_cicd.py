@@ -72,6 +72,8 @@ def dockerhub_webhook():
     repo_name = payload["repository"]["repo_name"]
     repo_url = payload["repository"]["repo_url"]
 
+    service.trigger_deployment_pipeline((repo_name + ":" + tag))
+
     return "OK"
 
 

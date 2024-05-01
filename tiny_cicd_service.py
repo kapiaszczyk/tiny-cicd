@@ -12,7 +12,7 @@ from tiny_cicd_logger import Logger
 deployments_dir = "deployments"
 dockerhub_repo_name = "kapiaszczyk"
 pipeline_dir = os.getcwd()
-
+deployment_params = {"port: 8080"}
 
 class TinyCICDService:
     """Tiny CI/CD service class."""
@@ -63,6 +63,14 @@ class TinyCICDService:
 
         self.push_image()
 
+    def trigger_deployment_pipeline(self, image_tag):
+        """Triggers the deployment pipeline"""
+
+        self.pull_image(image_tag)
+
+        self.deploy_image(image_tag, None)
+
+
     def pull_code(self):
         """Pull code from GitHub."""
 
@@ -107,6 +115,20 @@ class TinyCICDService:
         service = DockerService()
 
         service.push_image(self.last_tag_number)
+
+    def pull_image(self, image_tag):
+        """Pull image from Docker Hub."""
+
+        service = DockerService()
+
+        service.pull_image(image_tag)
+
+    def deploy_image(self, image_tag, deployment_params):
+        """Deploys the specified image"""
+
+        service = DockerService()
+
+        service.deploy_image(image_tag, deployment_params)
 
 
 class TestRunnerService:
@@ -487,3 +509,39 @@ class DockerService:
 
         except docker.errors.APIError as e:
             self.logger.log(f"Failed to push image to Docker Hub with reason: {e}", "error")
+
+    def pull_image(self, image_tag):
+        """Pulls image with specified tag from the Docker Hub"""
+        client = docker.from_env()
+
+        try:
+            client.images.pull(image_tag)
+        except Exception as e:
+            self.logger.log(f"Failed to pull image {image_tag} with reason: {e}", "error")
+
+    def deploy_image(self, image_tag, port_mapping):
+        """Runs the image with specified tag."""
+        client = docker.from_env()
+
+        # Overriding port_mapping for initial feature implementation
+        port_mapping = "5000:5000"
+
+        try:
+            ports = None
+            if port_mapping:
+                ports = {f"{port_mapping.split(':')[0]}/tcp": int(port_mapping.split(':')[1])}
+
+                print(ports)
+
+            container = client.containers.run(image_tag, ports=ports, detach=True)
+
+            self.logger.log(f"Container deployed successfully: {container.id}", "info")
+            return container.id
+
+        except docker.errors.ContainerError as e:
+            self.logger.log(f"Error deploying container: {e}", "error")
+            return None
+
+        except Exception as e:
+            self.logger.log(f"An unexpected error occurred: {e}", "error")
+            return None
