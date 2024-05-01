@@ -117,7 +117,9 @@ class TestRunnerService:
 
         os.chdir(project_dir)
 
-        if self.run_docker_build(image_tag):
+        service = DockerService()
+
+        if service.run_docker_build(image_tag):
             self.logger.log(f"Successfully built Docker image: {image_tag}")
             return image_tag
         else:
@@ -143,17 +145,18 @@ class TestRunnerService:
         shutil.copy(dockerfile_source_path, dockerfile_destination_path)
         self.logger.log(f"{dockerfile} copied successfully from '{dockerfile_source_path}' to '{dockerfile_destination_path}'.")
 
-    def run_docker_build(self, image_tag):
-        """Runs docker image build process."""
-        docker_build_cmd = ["docker", "build", "-t", image_tag, "."]
-        self.logger.log(f"Running Docker build command: {docker_build_cmd}")
 
-        try:
-            subprocess.check_call(docker_build_cmd)
-            return True
-        except subprocess.CalledProcessError as e:
-            self.logger.log(f"Error building Docker image: {e}")
-            return False
+    def restore_dockerfile(self, project_dir):
+        """Restores removed Dockerfile"""
+
+        if(os.path.exists(os.path.join(project_dir, "Dockerfile"))):
+            self.logger.log(f"Removing test Dockerfile from project directory: {project_dir}")
+            os.remove(os.path.join(project_dir, "Dockerfile"))
+            self.logger.log(f"Restoring Dockerfile from to directory: {self.saved_dockerfile_content}")
+            service = DockerService()
+            service.write_content_to_dockerfile(self.saved_dockerfile_content, (os.path.join(project_dir, "Dockerfile")))
+            self.logger.log("Succesfully written to file")
+
 
 
     def run_test_container(self, image_tag, project_dir):
@@ -161,59 +164,27 @@ class TestRunnerService:
 
         os.chdir(pipeline_dir)
 
-        if not image_tag:
-            logger.log("Failed to build Docker image. Aborting.")
-            return
+        service = DockerService()
 
-        client = docker.from_env()
+        exit_code = service.run_docker_image(image_tag)
 
-        try:
-            container = client.containers.run(
-                image=image_tag,
-                detach=True,
-            )
-
-            result = container.wait()
-            container.remove()
-
-            exit_code = result["StatusCode"]
-
-            if exit_code == 0:
-                logger.log("Tests passed")
-            else:
-                logger.log("Tests failed")
-        except docker.errors.ContainerError as e:
-            logger.log(f"Error running tests in Docker container: {e}")
-        except docker.errors.ImageNotFound as e:
-            logger.log(f"Docker image not found: {e}")
-        except Exception as e:
-            logger.log(f"An unexpected error occurred: {e}")
-
-        self.cleanup_after_tests(client, image_tag, project_dir)
+        self.cleanup_after_tests(image_tag, project_dir)
 
         return exit_code
 
 
-    def cleanup_after_tests(self, docker_client, image_tag, project_dir):
+    def cleanup_after_tests(self, image_tag, project_dir):
         """Cleans up test container and image"""
 
         os.chdir(pipeline_dir)
 
-        client = docker_client
-
         try:
-            image = client.images.get(image_tag)
-            client.images.remove(image.id)
 
-            self.logger.log(f"Successfully removed Docker image: {image_tag}")
+            service = DockerService()
+
+            service.remove_docker_image(image_tag)
         
-            if(os.path.exists(os.path.join(project_dir, "Dockerfile"))):
-                self.logger.log(f"Removing test Dockerfile from project directory: {project_dir}")
-                os.remove(os.path.join(project_dir, "Dockerfile"))
-                self.logger.log(f"Restoring Dockerfile from to directory: {self.saved_dockerfile_content}")
-                service = DockerService()
-                service.write_content_to_dockerfile(self.saved_dockerfile_content, (os.path.join(project_dir, "Dockerfile")))
-                self.logger.log("Succesfully written to file")
+            self.restore_dockerfile(project_dir)
 
         except docker.errors.ImageNotFound:
             print(f"Docker image not found: {image_tag}")
@@ -371,9 +342,69 @@ class DockerService:
         with open(path, 'r', encoding="UTF-8") as file:
             dockerfile_content = file.read()
             return dockerfile_content
-        
+
 
     def write_content_to_dockerfile(self, content, path):
         """Writes content to Dockerfile."""
         with open(path, 'w', encoding="UTF-8") as file:
             file.write(content)
+
+    def run_docker_build(self, image_tag):
+        """Runs docker image build process."""
+        docker_build_cmd = ["docker", "build", "-t", image_tag, "."]
+        logger.log(f"Running Docker build command: {docker_build_cmd}")
+
+        try:
+            subprocess.check_call(docker_build_cmd)
+            return True
+        except subprocess.CalledProcessError as e:
+            logger.log(f"Error building Docker image: {e}")
+            return False
+        
+    def run_docker_image(self, image_tag):
+        """Runs specified docker image and returns container exit status code."""
+
+        if not image_tag:
+            logger.log("No image tag provided.")
+            return
+        
+        client = docker.from_env()
+
+        try:
+            container = client.containers.run(
+                image=image_tag,
+                detach=True,
+            )
+
+            result = container.wait()
+            container.remove()
+
+            exit_code = result["StatusCode"]
+
+        except docker.errors.ContainerError as e:
+            logger.log(f"Error running tests in Docker container: {e}")
+        except docker.errors.ImageNotFound as e:
+            logger.log(f"Docker image not found: {e}")
+        except Exception as e:
+            logger.log(f"An unexpected error occurred: {e}")
+
+        return exit_code
+    
+
+    def remove_docker_image(self, image_tag):
+        """Removes docker image from the image list."""
+
+        client = docker.from_env()
+
+        try:
+            image = client.images.get(image_tag)
+            client.images.remove(image.id)
+
+            logger.log(f"Successfully removed Docker image: {image_tag}")
+
+        except docker.errors.ImageNotFound:
+            logger.log(f"Docker image not found: {image_tag}", "error")
+            return False
+        except Exception as e:
+            logger.log(f"An error occurred while removing Docker image: {e}", "error")
+            return False
