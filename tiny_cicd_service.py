@@ -102,7 +102,7 @@ class TinyCICDService:
         self.logger.log(f"Latest image tag is: {self.last_tag_number}")
 
     def push_image(self):
-        "Push image to DockerHub."
+        """Push image to DockerHub."""
 
         service = DockerService()
 
@@ -118,14 +118,14 @@ class TestRunnerService:
         self.saved_dockerfile_content = ""
         return
 
-    def run_tests(self, repo_name, project_type, pipeline_dir, project_dir):
+    def run_tests(self, repo_name, project_type, src_dir, project_dir):
         """Runs test suite for the managed project."""
 
-        image_tag = self.build_test_image(repo_name, project_type, pipeline_dir, project_dir)
+        image_tag = self.build_test_image(repo_name, project_type, src_dir, project_dir)
 
         return self.run_test_container(image_tag, project_dir)
 
-    def build_test_image(self, repo_name, project_type, pipeline_dir, project_dir):
+    def build_test_image(self, repo_name, project_type, src_dir, project_dir):
         """Builds test image for the managed project."""
         image_tag = f"tiny-cicd-testrunner-{repo_name}".lower()
         dockerfile = "Dockerfile"
@@ -133,7 +133,7 @@ class TestRunnerService:
         self.logger.log(f"Building Docker image with tag: {image_tag}")
 
         if self.remove_existing_dockerfile(project_dir, dockerfile):
-            self.copy_dockerfile(pipeline_dir, project_type, dockerfile, project_dir)
+            self.copy_dockerfile(src_dir, project_type, dockerfile, project_dir)
 
         service = DockerService()
 
@@ -155,9 +155,9 @@ class TestRunnerService:
             return True
         return False
 
-    def copy_dockerfile(self, pipeline_dir, project_type, dockerfile, project_dir):
+    def copy_dockerfile(self, src_dir, project_type, dockerfile, project_dir):
         """Copies the test Dockerfile template into the repository folder."""
-        dockerfile_source_path = os.path.join(pipeline_dir, "test-runner", project_type.lower(), dockerfile)
+        dockerfile_source_path = os.path.join(src_dir, "test-runner", project_type.lower(), dockerfile)
         dockerfile_destination_path = project_dir
 
         shutil.copy(dockerfile_source_path, dockerfile_destination_path)
@@ -232,26 +232,30 @@ class UtilService:
         else:
             return "UNSUPPORTED"
 
-    def is_maven_project(self, repo_directory):
+    @staticmethod
+    def is_maven_project(repo_directory):
         """Check if project is a Maven project (checks for pom.xml file)."""
         pom_xml_path = os.path.join(repo_directory, "pom.xml")
         return os.path.exists(pom_xml_path)
 
-    def is_dotnet_project(self, repo_directory):
+    @staticmethod
+    def is_dotnet_project(repo_directory):
         """Check if project is a .NET project (checks for .csproj file)."""
         for filename in os.listdir(repo_directory):
             if filename.endswith(".csproj") or filename.endswith(".cs"):
                 return True
         return False
 
-    def is_python_project(self, repo_directory):
+    @staticmethod
+    def is_python_project(repo_directory):
         """Check if project is a Python project (checks for requirements.txt file)"""
         requirements_txt_path = os.path.join(repo_directory, "requirements.txt")
         setup_py_path = os.path.join(repo_directory, "setup.py")
         return os.path.exists(requirements_txt_path) or os.path.exists(setup_py_path)
 
-    def is_go_project(self, repo_directory):
-        """Check if project is a Go project (checks for go.mod file)"""
+    @staticmethod
+    def is_go_project(repo_directory):
+        """Check if project is a Go project (checks for "go.mod" file)"""
         go_mod_path = os.path.join(repo_directory, "go.mod")
         return os.path.exists(go_mod_path)
 
@@ -267,7 +271,8 @@ class UtilService:
             self.logger.log(f"Name resolved to {name}", "info")
             return name
 
-    def parse_docker_image_tag(self, image_tag):
+    @staticmethod
+    def parse_docker_image_tag(image_tag):
         """Parse Docker image tag <repository>/<image_name>:<tag> into repository, image name, and tag."""
         if ':' in image_tag:
             repository_image, tag = image_tag.split(':')
@@ -380,13 +385,15 @@ class DockerService:
     def __init__(self) -> None:
         pass
 
-    def read_dockerfile_content(self, path):
+    @staticmethod
+    def read_dockerfile_content(path):
         """Reads Dockerfile content and returns it as a string."""
         with open(path, 'r', encoding="UTF-8") as file:
             dockerfile_content = file.read()
             return dockerfile_content
 
-    def write_content_to_dockerfile(self, content, path):
+    @staticmethod
+    def write_content_to_dockerfile(content, path):
         """Writes content to Dockerfile."""
         with open(path, 'w', encoding="UTF-8") as file:
             file.write(content)
@@ -429,6 +436,8 @@ class DockerService:
             container.remove()
 
             exit_code = result["StatusCode"]
+
+            return exit_code
 
         except docker.errors.ContainerError as e:
             self.logger.log(f"Error running tests in Docker container: {e}")
