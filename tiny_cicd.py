@@ -59,7 +59,20 @@ def github_webhook():
 @app.route("/webhook-dockerhub", methods=["POST"])
 def dockerhub_webhook():
     """Receive DockerHub push event."""
-    return "PLACEHOLDER"
+
+    payload = request.get_json()
+
+    pushed_at = payload["push_data"]["pushed_at"]
+    pusher = payload["push_data"]["pusher"]
+    tag = payload["push_data"]["tag"]
+
+    date_created = payload["repository"]["date_created"]
+    dockerfile = payload["repository"]["dockerfile"]
+    name = payload["repository"]["name"]
+    repo_name = payload["repository"]["repo_name"]
+    repo_url = payload["repository"]["repo_url"]
+
+    return "OK"
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5050, debug=True)
