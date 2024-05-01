@@ -77,5 +77,14 @@ def dockerhub_webhook():
     return "OK"
 
 
+@app.route("/shutdown", methods=["POST"])
+def shutdown():
+    """Receive shutdown request"""
+
+    result = service.trigger_shutdown()
+
+    return "OK"
+
+
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5050, debug=True)

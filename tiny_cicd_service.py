@@ -7,6 +7,7 @@ import docker
 import shutil
 import json
 
+from datetime import datetime, timedelta
 from tiny_cicd_logger import Logger
 
 deployments_dir = "deployments"
@@ -27,7 +28,8 @@ class TinyCICDService:
         self.project_type = ""
         self.pipeline_dir = pipeline_dir
         self.deployment_dir = deployments_dir
-        self.last_tag_number = ""
+        self.last_tag_number = None
+        self.deployed_container_id = None
 
     def to_json(self):
         data = {
@@ -66,9 +68,32 @@ class TinyCICDService:
     def trigger_deployment_pipeline(self, image_tag):
         """Triggers the deployment pipeline"""
 
+        image_name, tag = image_tag.split(':')
+
+        old_container_id = self.deployed_container_id
+
+        if old_container_id is None:
+            service = DockerService()
+            service.get_youngest_container_id(image_name)
+
         self.pull_image(image_tag)
 
+        self.stop_deployed_container()
+
         self.deploy_image(image_tag, None)
+
+        self.remove_paused_container(old_container_id)
+
+        image_name, tag = image_tag.split(':')
+
+        self.prune_images(3, (image_name))
+
+    def trigger_shutdown(self):
+        """Shuts down all containers"""
+
+        service = DockerService()
+
+        service.stop_all_containers()
 
 
     def pull_code(self):
@@ -128,8 +153,72 @@ class TinyCICDService:
 
         service = DockerService()
 
-        service.deploy_image(image_tag, deployment_params)
+        deployed_container_id = service.deploy_image(image_tag, deployment_params)
 
+        self.logger.log(f"Image to be deployed: {image_tag}")
+
+        if (id is None):
+            self.rollback_to_previous_container()
+        else:
+            self.deployed_container_id = deployed_container_id
+
+        self.logger.log(f"Deployed container id: {deployed_container_id}")
+
+    def stop_deployed_container(self):
+        """Stops the currently deployed container"""
+
+        service = DockerService()
+
+        container_to_be_stopped = self.deployed_container_id
+
+        if container_to_be_stopped is None:
+            self.logger.log("There is no deployed container or none to be stopped")
+        else:
+            self.logger.log(f"Container to be stopped: {container_to_be_stopped}")
+
+            service.stop_running_container(container_to_be_stopped)
+
+    def rollback_to_previous_container(self):
+        """Restart the paused container"""
+
+        service = DockerService()
+
+        container_to_be_restarted = self.deployed_container_id
+
+        if container_to_be_restarted is None:
+            self.logger.log("There is no previous container to rollback to")
+        else:
+            self.logger.log(f"Container to be restarted: {container_to_be_restarted}")
+
+            id = service.run_container(container_to_be_restarted)
+
+            self.deployed_container_id = id
+
+    def remove_paused_container(self, old_container_id):
+        """Removes paused containers"""
+
+        service = DockerService()
+
+        if old_container_id is None:
+            self.logger.log("There is no container to be removed")
+        else:
+
+            self.logger.log(f"Container to be removed: {old_container_id}")
+
+            service.remove_container(old_container_id)
+
+    def prune_images(self, old_images_to_keep, repo_name):
+        """Removes unused images"""
+
+        service = DockerService()
+
+        service.prune_unused_images(old_images_to_keep, repo_name)
+
+    def stop_all_containers(self):
+
+        service = DockerService()
+
+        service.stop_all_containers()
 
 class TestRunnerService:
     """Service class for running tests in a Docker container."""
@@ -540,6 +629,159 @@ class DockerService:
 
         except docker.errors.ContainerError as e:
             self.logger.log(f"Error deploying container: {e}", "error")
+            return None
+
+        except Exception as e:
+            self.logger.log(f"An unexpected error occurred: {e}", "error")
+            return None
+        
+    def stop_running_container(self, id):
+        """Stops a container by id"""
+
+        client = docker.from_env()
+
+        try:
+            container = client.containers.get(id)
+            container.stop()
+            self.logger.log(f"Container {id} stopped successfully", "info")
+            return True
+        except docker.errors.NotFound as e:
+            self.logger.log(f"Container {id} not found: {e}", "error")
+            return False
+        except docker.errors.APIError as e:
+            self.logger.log(f"Error pausing container {id}: {e}", "error")
+            return False
+        except Exception as e:
+            self.logger.log(f"An unexpected error occurred: {e}", "error")
+            return False
+        
+    def run_container(self, id):
+        """Runs a container passed by id"""
+
+        client = docker.from_env()
+
+        try:
+            container = client.containers.get(id)
+            container.unpause()
+            self.logger.log(f"Container {id} unpaused successfully", "info")
+            return True
+        except docker.errors.NotFound as e:
+            self.logger.log(f"Container {id} not found: {e}", "error")
+            return False
+        except docker.errors.APIError as e:
+            self.logger.log(f"Error unpausing container {id}: {e}", "error")
+            return False
+        except Exception as e:
+            self.logger.log(f"An unexpected error occurred: {e}", "error")
+            return False
+        
+    def remove_container(self, id):
+        """Removes specified container"""
+
+        client = docker.from_env()
+
+        try:
+            container = client.containers.get(id)
+            container.remove()
+            self.logger.log(f"Container {id} removed successfully", "info")
+            return True
+        except docker.errors.NotFound as e:
+            self.logger.log(f"Container {id} not found: {e}", "error")
+            return False
+        except docker.errors.APIError as e:
+            self.logger.log(f"Error removing container {id}: {e}", "error")
+            return False
+        except Exception as e:
+            self.logger.log(f"An unexpected error occurred: {e}", "error")
+            return False
+        
+    def prune_unused_images(self, amount, repo_name):
+        """Prunes specified amount of unused images from the specified repository."""
+
+        client = docker.from_env()
+
+        try:
+            # List all images matching the specified repository name
+            images = client.images.list(name=repo_name)
+
+            if not images:
+                self.logger.log(f"No images found for repository: {repo_name}", "info")
+                return
+
+            # Sort images by creation date (oldest to newest)
+            images.sort(key=lambda img: img.attrs['Created'])
+
+            # Determine the number of images to retain
+            images_to_keep = images[-amount:]
+
+            # Identify images to prune (those not in the list to keep)
+            images_to_prune = [img for img in images if img not in images_to_keep]
+
+            if not images_to_prune:
+                self.logger.log(f"No images to prune for repository: {repo_name}", "info")
+                return
+
+            # Prune unused images
+            for img in images_to_prune:
+                client.images.remove(img.id, force=True)
+                self.logger.log(f"Pruned image: {img.tags[0]}", "info")
+
+            self.logger.log(f"Successfully pruned unused images for repository: {repo_name}", "info")
+
+        except docker.errors.APIError as e:
+            self.logger.log(f"Failed to prune images: {e}", "error")
+
+        except Exception as e:
+            self.logger.log(f"An unexpected error occurred: {e}", "error")
+
+    def get_youngest_container_id(self, image_name):
+        """Retrieve the ID of the youngest running container from an image with the specified name."""
+        
+        client = docker.from_env()
+
+        try:
+            # Get all running containers
+            containers = client.containers.list()
+
+            # Filter containers by image name
+            filtered_containers = [container for container in containers if image_name in container.image.tags]
+
+            if not filtered_containers:
+                self.logger.log(f"No running containers found for image: {image_name}", "info")
+                return None
+
+            # Sort containers by creation time (newest to oldest)
+            filtered_containers.sort(key=lambda container: container.attrs['Created'], reverse=True)
+
+            # Retrieve the ID of the youngest (most recently created) container
+            youngest_container_id = filtered_containers[0].id
+
+            self.logger.log(f"Youngest container ID for image {image_name}: {youngest_container_id}", "info")
+            return youngest_container_id
+
+        except docker.errors.APIError as e:
+            self.logger.log(f"Failed to retrieve youngest container ID: {e}", "error")
+            return None
+
+        except Exception as e:
+            self.logger.log(f"An unexpected error occurred: {e}", "error")
+            return None
+        
+    def stop_all_containers(self):
+        """Shutdown all containers"""
+
+        self.logger.log(f"Stopping all containers")
+
+        client = docker.from_env()
+
+        try:
+            containers = client.containers.list()
+
+            for container in containers:
+                container.stop()
+
+        except docker.errors.APIError as e:
+            self.logger.log(f"Failed to stop containers with reason: {e}", "error")
             return None
 
         except Exception as e:
