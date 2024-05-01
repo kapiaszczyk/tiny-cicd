@@ -589,7 +589,6 @@ class DockerService:
         image_name = f"{repository}/{image_name}:{image_tag}"
 
         try:
-            # Push the image to Docker Hub
             for line in client.images.push(image_name, stream=True, decode=True):
                 if 'status' in line:
                     self.logger.log(f"Pushing: {line['status']}", "info")
@@ -701,7 +700,6 @@ class DockerService:
         client = docker.from_env()
 
         try:
-            # List all images matching the specified repository name
             images = client.images.list(name=repo_name)
 
             if not images:
@@ -721,7 +719,6 @@ class DockerService:
                 self.logger.log(f"No images to prune for repository: {repo_name}", "info")
                 return
 
-            # Prune unused images
             for img in images_to_prune:
                 client.images.remove(img.id, force=True)
                 self.logger.log(f"Pruned image: {img.tags[0]}", "info")
@@ -740,10 +737,8 @@ class DockerService:
         client = docker.from_env()
 
         try:
-            # Get all running containers
             containers = client.containers.list()
 
-            # Filter containers by image name
             filtered_containers = [container for container in containers if image_name in container.image.tags]
 
             if not filtered_containers:
@@ -751,9 +746,9 @@ class DockerService:
                 return None
 
             # Sort containers by creation time (newest to oldest)
+            # And retrieve the ID of the youngest (most recently created) container
             filtered_containers.sort(key=lambda container: container.attrs['Created'], reverse=True)
 
-            # Retrieve the ID of the youngest (most recently created) container
             youngest_container_id = filtered_containers[0].id
 
             self.logger.log(f"Youngest container ID for image {image_name}: {youngest_container_id}", "info")
