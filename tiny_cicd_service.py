@@ -10,6 +10,7 @@ import json
 from tiny_cicd_logger import Logger
 
 deployments_dir = "deployments"
+dockerhub_repo_name = "kapiaszczyk"
 pipeline_dir = os.getcwd()
 
 
@@ -58,6 +59,8 @@ class TinyCICDService:
 
         self.test_code()
 
+        self.build_image()
+
     def pull_code(self):
         """Pull code from GitHub."""
 
@@ -80,6 +83,19 @@ class TinyCICDService:
 
     def build_image(self):
         """Build Docker image."""
+
+        service = DockerService()
+
+        os.chdir(self.repo_directory)
+        git_service = GitService(self.repo_url, self.repo_directory, self.repo_name)
+        sha = git_service.get_commit_sha()
+        os.chdir(self.pipeline_dir)
+
+        image_tag = f"{dockerhub_repo_name}/{self.repo_name}:{sha}"
+
+        service.run_docker_build(image_tag, self.repo_directory)
+
+        self.last_tag_number = image_tag
 
 
 class TestRunnerService:
@@ -108,11 +124,9 @@ class TestRunnerService:
         if self.remove_existing_dockerfile(project_dir, dockerfile):
             self.copy_dockerfile(pipeline_dir, project_type, dockerfile, project_dir)
 
-        os.chdir(project_dir)
-
         service = DockerService()
 
-        if service.run_docker_build(image_tag):
+        if service.run_docker_build(image_tag, project_dir):
             self.logger.log(f"Successfully built Docker image: {image_tag}")
             return image_tag
         else:
@@ -149,7 +163,7 @@ class TestRunnerService:
             service = DockerService()
             service.write_content_to_dockerfile(self.saved_dockerfile_content,
                                                 (os.path.join(project_dir, "Dockerfile")))
-            self.logger.log("Succesfully written to file")
+            self.logger.log("Successfully written to file")
 
     def run_test_container(self, image_tag, project_dir):
         """Runs testing suite in a sibling container"""
@@ -186,7 +200,6 @@ class TestRunnerService:
 
 
 class UtilService:
-
     logger = Logger("UtilService")
 
     def __init__(self):
@@ -248,7 +261,6 @@ class GitService:
     """Service class for Git operations."""
 
     logger = Logger("GitService")
-
 
     def __init__(self, repo_url, repo_directory, repo_name):
         self.project_type = ""
@@ -313,12 +325,34 @@ class GitService:
         os.chdir(self.repo_directory)
         subprocess.check_call(["git", "pull", self.repo_url])
 
+    def get_commit_sha(self):
+        """Returns last commit SHA."""
+
+        self.logger.log("Retrieving last commit SHA")
+
+        command = "git rev-parse --short HEAD"
+
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode == 0:
+                return result.stdout.strip()
+            else:
+                raise RuntimeError(f"Git command failed with error:\n{result.stderr}")
+
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Error running Git command: {e}")
+
 
 class DockerService:
     """Class for handling Docker related operations."""
 
     logger = Logger("DockerService")
-
 
     def __init__(self) -> None:
         pass
@@ -334,16 +368,23 @@ class DockerService:
         with open(path, 'w', encoding="UTF-8") as file:
             file.write(content)
 
-    def run_docker_build(self, image_tag):
+    def run_docker_build(self, image_tag, build_directory):
         """Runs docker image build process."""
+
+        previous_directory = os.getcwd()
+
+        os.chdir(build_directory)
+
         docker_build_cmd = ["docker", "build", "-t", image_tag, "."]
         self.logger.log(f"Running Docker build command: {docker_build_cmd}")
 
         try:
             subprocess.check_call(docker_build_cmd)
+            os.chdir(previous_directory)
             return True
         except subprocess.CalledProcessError as e:
             self.logger.log(f"Error building Docker image: {e}")
+            os.chdir(previous_directory)
             return False
 
     def run_docker_image(self, image_tag):
