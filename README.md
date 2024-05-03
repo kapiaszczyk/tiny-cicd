@@ -1,30 +1,40 @@
-![pipeline-min](https://github.com/kapiaszczyk/tiny-cicd/assets/41442206/f4d48f9f-a697-4bcf-9b58-7a2a42b1a2fb)
-_This picture is here just to give you a break from all the text._
-
 # Tiny CI/CD
-An attempt at creating a local CI/CD pipeline that deploys a docker image to a RaspberryPI.
+Simple prototype CI/CD pipeline written in Python.
+
+![pipes](https://github.com/kapiaszczyk/tiny-cicd/assets/41442206/9da982c0-664a-4c58-a6f5-ad59daa0e19e)
+
+## About
+
+A simple CI/CD pipeline designed to automate the testing, building, and deployment of a Dockerized application. The pipeline is triggered by changes in a GitHub repository and integrates with Docker Hub for image management.
 
 ## The goal
 
 Run a simple CI/CD pipeline that includes running tests, building a Docker image, pushing it to Docker Hub, pulling and running it.
 
-## The constraints
-
-The pipeline will run on RaspberryPI and that is where the image will be deployed as well.
-
 ## The steps
 
-1. Check for changes in a github repository
-2. If changes are detected -> pull new code and run tests
-3. If tests pass -> build a docker image from a dockerfile included in the repo
-4. If building an image succedes -> push the image to a docker hub with new tag (in some way incremented)
-5. Check for changes on a dockerhub repo for a new image
-6. If there is a new image -> stop the previously running image and remove it
-7. If the previous image is stopped and removed -> pull the new image and run it
+1. Monitor GitHub Repository
+    -  The pipeline is notified of changes via a GitHub webhook.
+2. Pull Code and Run Tests
+    -  Upon detecting changes, the pipeline pulls the latest code and executes defined tests.
+3. Build Docker Image
+    -  If the tests pass successfully, the pipeline builds a Docker image using the provided Dockerfile from the repository.
+4. Push Image to Docker Hub
+    -  After a successful build, the image is tagged and pushed to Docker Hub, with a version based on the commit SHA.
+5. Monitor Docker Hub for New Image
+    -  The pipeline is notified of changes via a Dockr Hub webhook.
+6. Replace Running Container
+    -  When a new image is detected, the existing running container is stopped and removed.
+7. Pull and Run New Image
+    -  Finally, the updated image is pulled from Docker Hub and launched as a running container.
 
-## Features
-
-- notification on failure on any of the steps
-- notification on success in deploying the image in step 7
-- logs on each run
-- the pipeline does not proceed with next steps if any of the checks fails
+## Features (to be implemented)
+- [ ] Notifications
+    -  Notifications on critical failures and successfull deployment
+- [ ] Support for Maven projects, .NET, Go and Python projects
+- [ ] Automatic rollback on image deployment failure
+- [ ] Parameterised builds and configuration via environmental variables
+- [ ] Performance Monitoring
+- [ ] Different rollout strategies
+- [ ] Gracefull degradation of deployed containers
+- [ ] Ability to manage more than one project/container
