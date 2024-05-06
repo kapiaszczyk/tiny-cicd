@@ -52,20 +52,36 @@ class TinyCICDService:
     def trigger_pipeline(self, url, repo_name):
         """Trigger the CI/CD pipeline."""
 
+        self.status = "TRIGGERED"
+
         self.repo_name = repo_name
         self.repo_url = url
         self.repo_directory = os.path.join(self.deployment_dir, repo_name)
 
+        self.logger.log(f"Triggering pipeline for {repo_name}")
+
+        self.status = "PULLING CODE"
+
         self.pull_code()
+
+        self.status = "RUNNING TESTS"
 
         self.test_code()
 
+        self.status = "BUILDING IMAGE"
+
         self.build_image()
+
+        self.status = "PUSHING IMAGE"
 
         self.push_image()
 
+        self.status = "IDLE"
+
     def trigger_deployment_pipeline(self, image_tag):
         """Triggers the deployment pipeline"""
+
+        self.status = "DEPLOYING"
 
         image_name, tag = image_tag.split(':')
 
@@ -75,11 +91,19 @@ class TinyCICDService:
             service = DockerService()
             service.get_youngest_container_id(image_name)
 
+        self.status = "PULLING IMAGE"
+
         self.pull_image(image_tag)
+
+        self.status = "STOPPING CURRENTLY DEPLOYED CONTAINER"
 
         self.stop_deployed_container()
 
+        self.status = "DEPLOYING IMAGE"
+
         self.deploy_image(image_tag, None)
+
+        self.status = "CLEANING UP CONTAINERS"
 
         self.remove_paused_container(old_container_id)
 
@@ -87,8 +111,12 @@ class TinyCICDService:
 
         self.prune_images(3, (image_name))
 
+        self.status = "IDLE"
+
     def trigger_shutdown(self):
         """Shuts down all containers"""
+
+        self.status = "SHUTTING DOWN"
 
         service = DockerService()
 

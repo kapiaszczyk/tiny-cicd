@@ -1,17 +1,27 @@
 """Simple Flask CI/CD pipeline."""
 
 from flask import Flask, request, redirect
+from simple_websocket import Server, ConnectionClosed
 from tiny_cicd_service import TinyCICDService
 from tiny_cicd_logger import Logger
+import time
 
 app = Flask(__name__)
 service = TinyCICDService()
 logger = Logger("tiny-cicd")
 
 
-@app.route("/status")
+@app.route("/status", websocket=True)
 def status():
     """Get CI/CD service status."""
+    ws = Server(request.environ)
+
+    try:
+        while True:
+            ws.send(service.get_status())
+            time.sleep(5)
+    except ConnectionClosed:
+        pass
     return "OK"
 
 
