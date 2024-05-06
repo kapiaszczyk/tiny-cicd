@@ -7,7 +7,6 @@ import docker
 import shutil
 import json
 
-from datetime import datetime, timedelta
 from tiny_cicd_logger import Logger
 
 deployments_dir = "deployments"
@@ -633,7 +632,7 @@ class DockerService:
         except Exception as e:
             self.logger.log(f"An unexpected error occurred: {e}", "error")
             return None
-        
+
     def stop_running_container(self, id):
         """Stops a container by id"""
 
@@ -653,7 +652,7 @@ class DockerService:
         except Exception as e:
             self.logger.log(f"An unexpected error occurred: {e}", "error")
             return False
-        
+
     def run_container(self, id):
         """Runs a container passed by id"""
 
@@ -673,7 +672,7 @@ class DockerService:
         except Exception as e:
             self.logger.log(f"An unexpected error occurred: {e}", "error")
             return False
-        
+
     def remove_container(self, id):
         """Removes specified container"""
 
@@ -693,7 +692,7 @@ class DockerService:
         except Exception as e:
             self.logger.log(f"An unexpected error occurred: {e}", "error")
             return False
-        
+
     def prune_unused_images(self, amount, repo_name):
         """Prunes specified amount of unused images from the specified repository."""
 
@@ -733,7 +732,7 @@ class DockerService:
 
     def get_youngest_container_id(self, image_name):
         """Retrieve the ID of the youngest running container from an image with the specified name."""
-        
+
         client = docker.from_env()
 
         try:
@@ -761,7 +760,7 @@ class DockerService:
         except Exception as e:
             self.logger.log(f"An unexpected error occurred: {e}", "error")
             return None
-        
+
     def stop_all_containers(self):
         """Shutdown all containers"""
 
