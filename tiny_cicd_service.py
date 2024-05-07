@@ -309,7 +309,7 @@ class TestRunnerService:
         """Restores removed Dockerfile"""
 
         if os.path.exists(os.path.join(project_dir, "Dockerfile")):
-            self.logger.log(f"Removing test Dockerfile from project directory: {project_dir}")
+            print(os.path.join(project_dir, "Dockerfile"))
             os.remove(os.path.join(project_dir, "Dockerfile"))
             self.logger.log(f"Restoring Dockerfile to directory: {project_dir}")
             service = DockerService()
@@ -487,21 +487,37 @@ class GitService:
         subprocess.check_call(["git", "clone", self.repo_url])
 
     def pull_code(self):
-        """Pull code from GitHub."""
+        """Pull code from GitHub and check repository cleanliness."""
 
         self.logger.log("Pulling code from the repository", "info")
 
         os.chdir(self.repo_directory)
         subprocess.check_call(["git", "pull", self.repo_url])
 
+        if self.is_repo_clean():
+            self.logger.log("Repository is clean", "info")
+        else:
+            self.logger.log("Repository is not clean", "info")
+            self.rollback_state()
+
+    def is_repo_clean(self):
+        """Check if the repository is clean (no untracked or deleted files)."""
+
+        self.logger.log("Checking if repository is clean", "info")
+
+        result = subprocess.check_call(["git", "status", "--porcelain"])
+
+        if result == 0:
+            return True
+        else:
+            return False
+
     def rollback_state(self):
-        """Rolls back the repository to clean state."""
+        """Roll back the repository to a clean state (reset changes)."""
 
         self.logger.log("Rolling back repository to clean state", "info")
 
-        os.chdir(self.repo_directory)
         subprocess.check_call(["git", "reset", "--hard"])
-        subprocess.check_call(["git", "clean", "-fd"])
 
 
     def get_commit_sha(self):
