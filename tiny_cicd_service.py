@@ -494,6 +494,16 @@ class GitService:
         os.chdir(self.repo_directory)
         subprocess.check_call(["git", "pull", self.repo_url])
 
+    def rollback_state(self):
+        """Rolls back the repository to clean state."""
+
+        self.logger.log("Rolling back repository to clean state", "info")
+
+        os.chdir(self.repo_directory)
+        subprocess.check_call(["git", "reset", "--hard"])
+        subprocess.check_call(["git", "clean", "-fd"])
+
+
     def get_commit_sha(self):
         """Returns last commit SHA."""
 
