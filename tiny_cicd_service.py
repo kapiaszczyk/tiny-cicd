@@ -29,6 +29,7 @@ class TinyCICDService:
         self.deployment_dir = deployments_dir
         self.last_tag_number = None
         self.deployed_container_id = None
+        self.docker_service = DockerService()
 
     def to_json(self):
         data = {
@@ -99,8 +100,7 @@ class TinyCICDService:
         old_container_id = self.deployed_container_id
 
         if old_container_id is None:
-            service = DockerService()
-            service.get_youngest_container_id(image_name)
+            self.docker_service.get_youngest_container_id(image_name)
 
         self.status = "PULLING IMAGE"
 
@@ -129,9 +129,7 @@ class TinyCICDService:
 
         self.status = "SHUTTING DOWN"
 
-        service = DockerService()
-
-        service.stop_all_containers()
+        self.docker_service.stop_all_containers()
 
 
     def pull_code(self):
@@ -157,8 +155,6 @@ class TinyCICDService:
     def build_image(self):
         """Build Docker image."""
 
-        service = DockerService()
-
         os.chdir(self.repo_directory)
         git_service = GitService(self.repo_url, self.repo_directory, self.repo_name)
         sha = git_service.get_commit_sha()
@@ -166,7 +162,7 @@ class TinyCICDService:
 
         image_tag = f"{dockerhub_repo_name}/{self.repo_name}:{sha}"
 
-        service.run_docker_build(image_tag, self.repo_directory)
+        self.docker_service.run_docker_build(image_tag, self.repo_directory)
 
         self.last_tag_number = image_tag
 
@@ -175,16 +171,12 @@ class TinyCICDService:
     def push_image(self):
         """Push image to DockerHub."""
 
-        service = DockerService()
-
-        service.push_image(self.last_tag_number)
+        self.docker_service.push_image(self.last_tag_number)
 
     def pull_image(self, image_tag):
         """Pull image from Docker Hub."""
 
-        service = DockerService()
-
-        service.pull_image(image_tag)
+        self.docker_service.pull_image(image_tag)
 
     def deploy_image(self, image_tag, deployment_params):
         """Deploys the specified image"""
@@ -531,8 +523,8 @@ class DockerService:
 
     logger = Logger("DockerService")
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self):
+        self.client = docker.from_env()
 
     @staticmethod
     def read_dockerfile_content(path):
@@ -573,10 +565,8 @@ class DockerService:
             self.logger.log("No image tag provided.")
             return
 
-        client = docker.from_env()
-
         try:
-            container = client.containers.run(
+            container = self.client.containers.run(
                 image=image_tag,
                 detach=True,
             )
@@ -600,11 +590,9 @@ class DockerService:
     def remove_docker_image(self, image_tag):
         """Removes docker image from the image list."""
 
-        client = docker.from_env()
-
         try:
-            image = client.images.get(image_tag)
-            client.images.remove(image.id)
+            image = self.client.images.get(image_tag)
+            self.client.images.remove(image.id)
 
             self.logger.log(f"Successfully removed Docker image: {image_tag}")
 
@@ -622,12 +610,10 @@ class DockerService:
 
         repository, image_name, image_tag = util_service.parse_docker_image_tag(image_tag)
 
-        client = docker.from_env()
-
         image_name = f"{repository}/{image_name}:{image_tag}"
 
         try:
-            for line in client.images.push(image_name, stream=True, decode=True):
+            for line in self.client.images.push(image_name, stream=True, decode=True):
                 if 'status' in line:
                     self.logger.log(f"Pushing: {line['status']}", "info")
 
@@ -638,28 +624,27 @@ class DockerService:
 
     def pull_image(self, image_tag):
         """Pulls image with specified tag from the Docker Hub"""
-        client = docker.from_env()
 
         try:
-            client.images.pull(image_tag)
+            self.client.images.pull(image_tag)
         except Exception as e:
             self.logger.log(f"Failed to pull image {image_tag} with reason: {e}", "error")
 
     def deploy_image(self, image_tag, port_mapping):
         """Runs the image with specified tag."""
-        client = docker.from_env()
 
         # Overriding port_mapping for initial feature implementation
         port_mapping = "5000:5000"
+
+        if not image_tag:
+            self.logger.log("No image tag provided", "error")
+            return None
 
         try:
             ports = None
             if port_mapping:
                 ports = {f"{port_mapping.split(':')[0]}/tcp": int(port_mapping.split(':')[1])}
-
-                print(ports)
-
-            container = client.containers.run(image_tag, ports=ports, detach=True)
+            container = self.client.containers.run(image_tag, ports=ports, detach=True)
 
             self.logger.log(f"Container deployed successfully: {container.id}", "info")
             return container.id
@@ -675,10 +660,8 @@ class DockerService:
     def stop_running_container(self, id):
         """Stops a container by id"""
 
-        client = docker.from_env()
-
         try:
-            container = client.containers.get(id)
+            container = self.client.containers.get(id)
             container.stop()
             self.logger.log(f"Container {id} stopped successfully", "info")
             return True
@@ -695,10 +678,8 @@ class DockerService:
     def run_container(self, id):
         """Runs a container passed by id"""
 
-        client = docker.from_env()
-
         try:
-            container = client.containers.get(id)
+            container = self.client.containers.get(id)
             container.unpause()
             self.logger.log(f"Container {id} unpaused successfully", "info")
             return True
@@ -715,10 +696,8 @@ class DockerService:
     def remove_container(self, id):
         """Removes specified container"""
 
-        client = docker.from_env()
-
         try:
-            container = client.containers.get(id)
+            container = self.client.containers.get(id)
             container.remove()
             self.logger.log(f"Container {id} removed successfully", "info")
             return True
@@ -735,10 +714,8 @@ class DockerService:
     def prune_unused_images(self, amount, repo_name):
         """Prunes specified amount of unused images from the specified repository."""
 
-        client = docker.from_env()
-
         try:
-            images = client.images.list(name=repo_name)
+            images = self.client.images.list(name=repo_name)
 
             if not images:
                 self.logger.log(f"No images found for repository: {repo_name}", "info")
@@ -758,7 +735,7 @@ class DockerService:
                 return
 
             for img in images_to_prune:
-                client.images.remove(img.id, force=True)
+                self.client.images.remove(img.id, force=True)
                 self.logger.log(f"Pruned image: {img.tags[0]}", "info")
 
             self.logger.log(f"Successfully pruned unused images for repository: {repo_name}", "info")
@@ -772,10 +749,12 @@ class DockerService:
     def get_youngest_container_id(self, image_name):
         """Retrieve the ID of the youngest running container from an image with the specified name."""
 
-        client = docker.from_env()
+        if image_name is None:
+            self.logger.log("No image name provided", "error")
+            return None
 
         try:
-            containers = client.containers.list()
+            containers = self.client.containers.list()
 
             filtered_containers = [container for container in containers if image_name in container.image.tags]
 
@@ -805,10 +784,8 @@ class DockerService:
 
         self.logger.log(f"Stopping all containers")
 
-        client = docker.from_env()
-
         try:
-            containers = client.containers.list()
+            containers = self.client.containers.list()
 
             for container in containers:
                 container.stop()

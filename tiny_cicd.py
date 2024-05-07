@@ -22,23 +22,18 @@ def status():
             time.sleep(5)
     except ConnectionClosed:
         pass
-    return "OK"
 
 
 @app.route("/details")
 def details():
     """Get CI/CD service details."""
-    details = service.get_pipeline_details()
-    logger.log("details")
-    return details, 200, {"Content-Type": "application/json"}
+    return service.get_pipeline_details(), 200, {"Content-Type": "application/json"}
 
 
 @app.route("/pipeline-status")
 def pipeline_status():
     """Get CI/CD pipeline status."""
-    pipeline_status_value = service.get_status()
-    logger.log(f"Pipeline status: {pipeline_status_value}", "info")
-    return pipeline_status_value
+    return service.get_status(), 200, {"Content-Type": "application/json"}
 
 
 @app.route("/status/last-deploy")
@@ -58,12 +53,9 @@ def github_webhook():
     last_commit = payload["payload"]["after"]
     previous_commit = payload["payload"]["before"]
 
-    logger.log(f"Received push event for {repo_name} with commit {last_commit}", "info")
-    logger.log(f"Previous commit was {previous_commit}", "info")
-
     service.trigger_pipeline(url, repo_name)
 
-    return "OK"
+    return "OK", 200, {"Content-Type": "application/json"}
 
 
 @app.route("/webhook-dockerhub", methods=["POST"])
@@ -84,16 +76,16 @@ def dockerhub_webhook():
 
     service.trigger_deployment_pipeline((repo_name + ":" + tag))
 
-    return "OK"
+    return "OK", 200, {"Content-Type": "application/json"}
 
 
 @app.route("/shutdown", methods=["POST"])
 def shutdown():
     """Receive shutdown request"""
 
-    result = service.trigger_shutdown()
+    service.trigger_shutdown()
 
-    return "OK"
+    return "OK", 200, {"Content-Type": "application/json"}
 
 
 if __name__ == '__main__':
