@@ -1,10 +1,11 @@
 """Simple Flask CI/CD pipeline."""
 
-from flask import Flask, request, redirect
+import time
+
+from flask import Flask, request
 from simple_websocket import Server, ConnectionClosed
 from tiny_cicd_service import TinyCICDService
 from tiny_cicd_logger import Logger
-import time
 
 app = Flask(__name__)
 service = TinyCICDService()

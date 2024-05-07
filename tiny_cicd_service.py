@@ -1,11 +1,12 @@
 """Service part for the tiny CI/CD system"""
 
-import os
-import git
 import subprocess
-import docker
 import shutil
 import json
+import os
+import git
+import docker
+
 
 from tiny_cicd_logger import Logger
 
