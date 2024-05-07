@@ -33,6 +33,7 @@ class TinyCICDService:
         self.docker_service = DockerService()
 
     def to_json(self):
+        """Converts pipeline details to JSON format."""
         data = {
             "status": self.status,
             "repo_name": self.repo_name,
@@ -60,6 +61,7 @@ class TinyCICDService:
         return self.status
 
     def get_pipeline_details(self):
+        """Get CI/CD pipeline details."""
         return self.to_json()
 
     def trigger_pipeline(self, url, repo_name):
@@ -188,7 +190,7 @@ class TinyCICDService:
 
         self.logger.log(f"Image to be deployed: {image_tag}")
 
-        if (id is None):
+        if id is None:
             self.rollback_to_previous_container()
         else:
             self.deployed_container_id = deployed_container_id
@@ -221,9 +223,9 @@ class TinyCICDService:
         else:
             self.logger.log(f"Container to be restarted: {container_to_be_restarted}")
 
-            id = service.run_container(container_to_be_restarted)
+            container_id = service.run_container(container_to_be_restarted)
 
-            self.deployed_container_id = id
+            self.deployed_container_id = container_id
 
     def remove_paused_container(self, old_container_id):
         """Removes paused containers"""
@@ -246,6 +248,7 @@ class TinyCICDService:
         service.prune_unused_images(old_images_to_keep, repo_name)
 
     def stop_all_containers(self):
+        """Stops all running containers"""
 
         service = DockerService()
 
@@ -283,7 +286,7 @@ class TestRunnerService:
             self.logger.log(f"Successfully built Docker image: {image_tag}")
             return image_tag
         else:
-            self.logger.log(f"Error building Docker image.")
+            self.logger.log("Error building Docker image.")
             return None
 
     def remove_existing_dockerfile(self, project_dir, dockerfile):
@@ -353,6 +356,8 @@ class TestRunnerService:
 
 
 class UtilService:
+    """Service class for utility functions."""
+
     logger = Logger("UtilService")
 
     def __init__(self):
@@ -461,7 +466,7 @@ class GitService:
         if os.path.exists(self.repo_directory):
             self.logger.log("Deployment directory exists", "info")
             if self.is_git_repo():
-                self.logger.log(f"Repository is cloned", "info")
+                self.logger.log("Repository is cloned", "info")
                 return True
             else:
                 self.logger.log(f"Repository is not cloned but {self.repo_directory} exists", "info")
@@ -670,7 +675,7 @@ class DockerService:
         try:
             ports = None
             if port_mapping:
-                ports = {f"{port_mapping.split(':')[0]}/tcp": int(port_mapping.split(':')[1])}
+                ports = {f"{port_mapping.split(':', maxsplit=1)[0]}/tcp": int(port_mapping.split(':')[1])}
             container = self.client.containers.run(image_tag, ports=ports, detach=True)
 
             self.logger.log(f"Container deployed successfully: {container.id}", "info")
@@ -684,34 +689,34 @@ class DockerService:
             self.logger.log(f"An unexpected error occurred: {e}", "error")
             return None
 
-    def stop_running_container(self, id):
+    def stop_running_container(self, container_id):
         """Stops a container by id"""
 
         try:
-            container = self.client.containers.get(id)
+            container = self.client.containers.get(container_id)
             container.stop()
-            self.logger.log(f"Container {id} stopped successfully", "info")
+            self.logger.log(f"Container {container_id} stopped successfully", "info")
             return True
         except docker.errors.NotFound as e:
-            self.logger.log(f"Container {id} not found: {e}", "error")
+            self.logger.log(f"Container {container_id} not found: {e}", "error")
             return False
         except docker.errors.APIError as e:
-            self.logger.log(f"Error pausing container {id}: {e}", "error")
+            self.logger.log(f"Error pausing container {container_id}: {e}", "error")
             return False
         except Exception as e:
             self.logger.log(f"An unexpected error occurred: {e}", "error")
             return False
 
-    def run_container(self, id):
+    def run_container(self, container_id):
         """Runs a container passed by id"""
 
         try:
-            container = self.client.containers.get(id)
+            container = self.client.containers.get(container_id)
             container.unpause()
-            self.logger.log(f"Container {id} unpaused successfully", "info")
+            self.logger.log(f"Container {container_id} unpaused successfully", "info")
             return True
         except docker.errors.NotFound as e:
-            self.logger.log(f"Container {id} not found: {e}", "error")
+            self.logger.log(f"Container {container_id} not found: {e}", "error")
             return False
         except docker.errors.APIError as e:
             self.logger.log(f"Error unpausing container {id}: {e}", "error")
@@ -720,19 +725,19 @@ class DockerService:
             self.logger.log(f"An unexpected error occurred: {e}", "error")
             return False
 
-    def remove_container(self, id):
+    def remove_container(self, container_id):
         """Removes specified container"""
 
         try:
-            container = self.client.containers.get(id)
+            container = self.client.containers.get(container_id)
             container.remove()
-            self.logger.log(f"Container {id} removed successfully", "info")
+            self.logger.log(f"Container {container_id} removed successfully", "info")
             return True
         except docker.errors.NotFound as e:
-            self.logger.log(f"Container {id} not found: {e}", "error")
+            self.logger.log(f"Container {container_id} not found: {e}", "error")
             return False
         except docker.errors.APIError as e:
-            self.logger.log(f"Error removing container {id}: {e}", "error")
+            self.logger.log(f"Error removing container {container_id}: {e}", "error")
             return False
         except Exception as e:
             self.logger.log(f"An unexpected error occurred: {e}", "error")
@@ -809,7 +814,7 @@ class DockerService:
     def stop_all_containers(self):
         """Shutdown all containers"""
 
-        self.logger.log(f"Stopping all containers")
+        self.logger.log("Stopping all containers")
 
         try:
             containers = self.client.containers.list()
