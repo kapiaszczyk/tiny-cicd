@@ -44,7 +44,7 @@ def pipeline_status():
 @app.route("/status/last-deploy")
 def last_deploy():
     """Get last deploy status."""
-    return "PLACEHOLDER"
+    return service.get_last_deployment_details(), 200, {"Content-Type": "application/json"}
 
 
 @app.route("/webhook-github", methods=["POST"])

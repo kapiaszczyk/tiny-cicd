@@ -42,6 +42,17 @@ class TinyCICDService:
         }
         return json.dumps(data)
 
+    def get_last_deployment_details(self):
+        """Get the last deployment details."""
+
+        data = {
+            "last_tag_number": self.last_tag_number,
+            "deployed_container_id": self.deployed_container_id
+        }
+
+        return json.dumps(data)
+
+
     def get_status(self):
         """Get CI/CD pipeline status."""
         return self.status
